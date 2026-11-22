@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { notoKr, rubik, russo } from '@/app/fonts'
 import { Game, type Action, type GameInfo, type GameMode } from '@/lib/game/engine'
 import {
+  DifficultyScreen,
   GameOverScreen,
   IntroCard,
   LevelCompleteScreen,
@@ -14,7 +15,7 @@ import {
 } from './screens'
 import { TouchControls } from './touch-controls'
 
-const EMPTY_INFO: GameInfo = { level: 0, score: 0, kills: 0, time: 0, maxCombo: 0 }
+const EMPTY_INFO: GameInfo = { difficulty: 'chocolate', level: 0, score: 0, kills: 0, time: 0, maxCombo: 0 }
 
 export function GameShell() {
   const frameRef = useRef<HTMLDivElement>(null)
@@ -74,7 +75,14 @@ export function GameShell() {
         aria-label="Игровое поле: Давид сражается с врагами"
       />
 
-      {mode === 'title' && <TitleScreen onStart={(i) => game()?.startGame(i)} />}
+      {mode === 'title' && <TitleScreen onStart={(i) => game()?.openDifficulty(i)} />}
+      {mode === 'difficulty' && (
+        <DifficultyScreen
+          level={info.level}
+          onPick={(d) => game()?.startGame(info.level, d)}
+          onBack={() => game()?.toMenu()}
+        />
+      )}
       {mode === 'intro' && <IntroCard level={info.level} />}
       {mode === 'paused' && <PauseScreen onResume={() => game()?.togglePause()} onMenu={() => game()?.toMenu()} />}
       {mode === 'gameover' && (

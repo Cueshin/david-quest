@@ -1,6 +1,6 @@
 export type Facing = 1 | -1
 
-export type HairStyle = 'short' | 'buzz' | 'spiky' | 'long' | 'perm' | 'bald' | 'side'
+export type HairStyle = 'short' | 'buzz' | 'spiky' | 'wavy' | 'long' | 'perm' | 'bald' | 'side'
 
 export type Accessory =
   | 'chain'
@@ -20,8 +20,15 @@ export type Accessory =
   | 'leather'
   | 'blazer'
   | 'plaid'
+  | 'supreme'
+  | 'beard'
+  | 'doppi'
+  | 'shortsleeve'
+  | 'backpack'
 
 export interface Look {
+  slim?: number
+  wide?: number
   skin: string
   hair: string
   hairStyle: HairStyle
@@ -34,9 +41,11 @@ export interface Look {
 
 export type Behavior = 'melee' | 'ranged' | 'boss'
 
-export type ProjectileKind = 'wave' | 'snowball' | 'wrench' | 'book' | 'exam' | 'bottle' | 'coupon'
+export type ProjectileKind = 'wave' | 'snowball' | 'wrench' | 'book' | 'exam' | 'bottle' | 'coupon' | 'brick' | 'phone'
 
-export type PickupKind = 'kimbap' | 'ramyeon' | 'energy' | 'glove'
+export type ItemKind = 'iphone' | 'supreme' | 'tagclub' | 'cap'
+
+export type PickupKind = 'kimbap' | 'ramyeon' | 'chicken' | 'energy' | 'glove' | ItemKind
 
 export interface EnemyDef {
   id: string

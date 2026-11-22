@@ -49,6 +49,9 @@ export function TouchControls(props: TouchControlsProps) {
           <ChevronLeft className="size-7" />
         </Pad>
         <div className="flex flex-col gap-2">
+          <Pad {...props} action="dodge" label="Уворот" className="size-12 font-display text-[10px] text-emerald-300">
+            УВОР
+          </Pad>
           <Pad {...props} action="down" label="Спрыгнуть" className="size-11">
             <ChevronDown className="size-5" />
           </Pad>

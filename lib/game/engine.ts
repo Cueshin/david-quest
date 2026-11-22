@@ -11,8 +11,10 @@ import {
   type AttackKind,
   type FState,
 } from './draw'
-import { ENEMY_DEFS, HIT_WORDS, LEVELS, PLAYER_LOOK } from './levels'
-import type { EnemyDef, Facing, LevelDef, Look, PickupKind, ProjectileKind } from './types'
+import { DIFFICULTIES, type Difficulty } from './difficulty'
+import { ITEM_INFO, ITEM_KINDS, isItem } from './items'
+import { ENEMY_DEFS, HIT_WORDS, LEVELS, PLAYER_LOOK, RAP_SHOUTS } from './levels'
+import type { EnemyDef, Facing, ItemKind, LevelDef, Look, PickupKind, ProjectileKind } from './types'
 
 export const W = 960
 export const H = 540
@@ -20,11 +22,13 @@ const GROUND = 470
 const FLOOR_TOP = 446
 const GRAVITY = 2300
 const PROJ_G = 900
+const DODGE_CD = 0.85
 
-export type GameMode = 'title' | 'intro' | 'playing' | 'paused' | 'levelComplete' | 'gameover' | 'victory'
-export type Action = 'left' | 'right' | 'jump' | 'down' | 'punch' | 'kick' | 'special' | 'pause' | 'confirm'
+export type GameMode = 'title' | 'difficulty' | 'intro' | 'playing' | 'paused' | 'levelComplete' | 'gameover' | 'victory'
+export type Action = 'left' | 'right' | 'jump' | 'down' | 'punch' | 'kick' | 'special' | 'dodge' | 'pause' | 'confirm'
 
 export interface GameInfo {
+  difficulty: Difficulty
   level: number
   score: number
   kills: number
@@ -48,6 +52,9 @@ const KEYMAP: Record<string, Action> = {
   KeyX: 'kick',
   KeyL: 'special',
   KeyC: 'special',
+  ShiftLeft: 'dodge',
+  ShiftRight: 'dodge',
+  KeyV: 'dodge',
   Escape: 'pause',
   KeyP: 'pause',
   Enter: 'confirm',
@@ -161,11 +168,22 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 const approach = (v: number, target: number, d: number) =>
   v < target ? Math.min(target, v + d) : Math.max(target, v - d)
 
+const PLAYER_SKIN_BY_DIFFICULTY: Record<Difficulty, string> = {
+  white: '#f3dfd0',
+  chocolate: '#9b6545',
+  black: '#493027',
+}
+
 const PICKUP_LABEL: Record<PickupKind, string> = {
   kimbap: '+30 HP Кимбап',
   ramyeon: '+60 HP Рамён',
+  chicken: '+100 HP Чикин!',
   energy: 'Энергетик! Полная энергия',
   glove: 'Перчатка силы! x2 урон',
+  iphone: ITEM_INFO.iphone.name,
+  supreme: ITEM_INFO.supreme.name,
+  tagclub: ITEM_INFO.tagclub.name,
+  cap: ITEM_INFO.cap.name,
 }
 
 const CONFETTI = ['#f5c518', '#e23636', '#ffffff', '#2d6cdf', '#2f9e5b', '#ff6fb1']
@@ -227,6 +245,17 @@ export class Game {
   private punchChainT = 0
   private punchQueued = false
   private spawnSide = 1
+  private difficulty: Difficulty = 'chocolate'
+  private items = new Set<ItemKind>()
+  private levelStartItems = new Set<ItemKind>()
+  private pendingLevel = 0
+  private dodgeT = 0
+  private dodgeDur = 0.34
+  private dodgeCd = 0
+  private dodgeDir: Facing = 1
+  private dodgePerfect = false
+  private ghostT = 0
+  private ghosts: { x: number; y: number; facing: Facing; roll: number; life: number }[] = []
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -272,12 +301,23 @@ export class Game {
     this.held.delete(a)
   }
 
-  startGame(levelIndex = 0) {
+  openDifficulty(levelIndex = 0) {
     this.audio.init()
+    this.pendingLevel = levelIndex
+    this.setMode('difficulty')
+  }
+
+  startGame(levelIndex = 0, difficulty?: Difficulty) {
+    this.audio.init()
+    if (difficulty) this.difficulty = difficulty
     this.score = 0
     this.kills = 0
     this.playTime = 0
     this.maxCombo = 0
+    this.items = new Set()
+    for (let j = 0; j < levelIndex; j++) {
+      for (const k of LEVELS[j].pickups) if (isItem(k.kind)) this.items.add(k.kind)
+    }
     this.loadLevel(levelIndex)
   }
 
@@ -289,12 +329,14 @@ export class Game {
     this.audio.init()
     this.score = this.levelStartScore
     this.kills = this.levelStartKills
+    this.items = new Set(this.levelStartItems)
     this.loadLevel(this.levelIndex)
   }
 
   togglePause() {
     if (this.mode === 'playing') this.setMode('paused')
     else if (this.mode === 'paused') this.setMode('playing')
+    else if (this.mode === 'difficulty') this.toMenu()
   }
 
   toMenu() {
@@ -316,7 +358,8 @@ export class Game {
 
   private info(): GameInfo {
     return {
-      level: this.levelIndex,
+      difficulty: this.difficulty,
+      level: this.mode === 'difficulty' ? this.pendingLevel : this.levelIndex,
       score: Math.round(this.score),
       kills: this.kills,
       time: this.playTime,
@@ -347,12 +390,29 @@ export class Game {
     if (this.mode === 'playing') this.setMode('paused')
   }
 
+  private playerMaxHp() {
+    return Math.round(100 * DIFFICULTIES[this.difficulty].playerHp) + (this.items.has('supreme') ? 30 : 0)
+  }
+
+  private specialCost() {
+    return this.items.has('iphone') ? 35 : 50
+  }
+
+  private eDmg(n: number) {
+    return Math.max(1, Math.round(n * DIFFICULTIES[this.difficulty].enemyDmg))
+  }
+
   private makePlayer(): Fighter {
+    const maxHp = this.playerMaxHp()
     return {
       id: 0,
       isPlayer: true,
       def: null,
-      look: PLAYER_LOOK,
+      look: {
+        ...PLAYER_LOOK,
+        skin: PLAYER_SKIN_BY_DIFFICULTY[this.difficulty],
+        ...(this.items.has('tagclub') ? { top: '#c4512f', trim: '#f5c518' } : {}),
+      },
       x: 140,
       y: GROUND,
       vx: 0,
@@ -363,8 +423,8 @@ export class Game {
       facing: 1,
       onGround: true,
       dropT: 0,
-      hp: 100,
-      maxHp: 100,
+      hp: maxHp,
+      maxHp,
       state: 'idle',
       stateT: 0,
       attack: null,
@@ -383,10 +443,16 @@ export class Game {
     this.level = LEVELS[i]
     this.levelStartScore = this.score
     this.levelStartKills = this.kills
+    this.levelStartItems = new Set(this.items)
     this.player = this.makePlayer()
     this.enemies = []
     this.projectiles = []
-    this.pickups = this.level.pickups.map((p) => ({ x: p.x, y: p.y, vy: 0, kind: p.kind, t: Math.random() * 3 }))
+    this.pickups = this.level.pickups
+      .filter((p) => !(isItem(p.kind) && this.items.has(p.kind)))
+      .map((p) => ({ x: p.x, y: p.y, vy: 0, kind: p.kind, t: Math.random() * 3 }))
+    this.dodgeT = 0
+    this.dodgeCd = 0
+    this.ghosts = []
     this.particles = []
     this.pops = []
     this.ambient = []
@@ -423,7 +489,7 @@ export class Game {
     const pr = this.pressed
     if (pr.has('pause')) this.togglePause()
     if (pr.has('confirm')) {
-      if (this.mode === 'title') this.startGame(0)
+      if (this.mode === 'title') this.openDifficulty(0)
       else if (this.mode === 'levelComplete') this.nextLevel()
       else if (this.mode === 'gameover') this.retry()
     }
@@ -439,6 +505,7 @@ export class Game {
 
     switch (this.mode) {
       case 'title':
+      case 'difficulty':
         this.player.animT += dt
         this.player.state = 'idle'
         this.camX = (this.camX + dt * 30) % 3000
@@ -554,6 +621,7 @@ export class Game {
     if (p.invulnT > 0) p.invulnT -= dt
     if (p.flashT > 0) p.flashT -= dt
     if (this.punchChainT > 0) this.punchChainT -= dt
+    if (this.dodgeCd > 0) this.dodgeCd -= dt
     const pr = this.pressed
 
     if (p.state === 'dead') {
@@ -573,7 +641,10 @@ export class Game {
       }
     } else {
       const dir = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0)
-      if (p.attack) {
+      if (pr.has('dodge') && this.dodgeCd <= 0 && this.dodgeT <= 0 && this.completeT < 0) this.startDodge(dir)
+      if (this.dodgeT > 0) {
+        this.updateDodge(dt)
+      } else if (p.attack) {
         const a = p.attack
         a.t += dt
         if (p.onGround && a.kind !== 'airkick') p.vx = approach(p.vx, 0, 2200 * dt)
@@ -590,7 +661,7 @@ export class Game {
           }
         }
       } else {
-        p.vx = dir * 270
+        p.vx = dir * 270 * (this.items.has('cap') ? 1.12 : 1)
         if (dir) p.facing = dir as Facing
         p.state = p.onGround ? (dir ? 'walk' : 'idle') : 'jump'
         if (pr.has('jump') && p.onGround) {
@@ -613,6 +684,56 @@ export class Game {
     const left = this.camX + p.w
     const right = this.locked ? this.camX + W - p.w : this.level.length - 40
     p.x = clamp(p.x, left, right)
+  }
+
+  private startDodge(dir: number) {
+    const p = this.player
+    this.dodgeDir = (dir !== 0 ? dir : -p.facing) as Facing
+    if (dir !== 0) p.facing = dir as Facing
+    this.dodgeDur = 0.34 + (this.items.has('cap') ? 0.1 : 0)
+    this.dodgeT = this.dodgeDur
+    this.dodgeCd = DODGE_CD + this.dodgeDur * 0.5
+    this.dodgePerfect = false
+    this.ghostT = 0
+    p.attack = null
+    p.state = 'dodge'
+    this.punchQueued = false
+    this.audio.whoosh()
+    this.dust(p.x, p.y, 6)
+  }
+
+  private updateDodge(dt: number) {
+    const p = this.player
+    this.dodgeT -= dt
+    const k = Math.max(0, this.dodgeT / this.dodgeDur)
+    p.vx = this.dodgeDir * (240 + 520 * k)
+    p.state = 'dodge'
+    this.ghostT -= dt
+    if (this.ghostT <= 0) {
+      this.ghostT = 0.045
+      this.ghosts.push({ x: p.x, y: p.y, facing: p.facing, roll: this.rollAngle(), life: 0.28 })
+    }
+    if (Math.random() < dt * 40) this.dust(p.x, p.y, 1)
+    if (this.dodgeT <= 0) {
+      this.dodgeT = 0
+      p.vx *= 0.4
+      p.state = p.onGround ? 'idle' : 'jump'
+    }
+  }
+
+  private rollAngle() {
+    if (this.dodgeT <= 0) return 0
+    return (1 - this.dodgeT / this.dodgeDur) * Math.PI * 2 * this.dodgeDir * this.player.facing
+  }
+
+  private onDodgedHit() {
+    if (this.dodgePerfect) return
+    this.dodgePerfect = true
+    const p = this.player
+    this.pop(p.x, p.y - 140, 'УВОРОТ!', '#7CFC9A', 26)
+    this.energy = Math.min(100, this.energy + 15)
+    this.score += 25
+    this.sparks(p.x, p.y - 60, 8, '#7CFC9A')
   }
 
   private startPunch() {
@@ -644,11 +765,12 @@ export class Game {
 
   private startSpecial() {
     const p = this.player
-    if (this.energy < 50) {
+    const cost = this.specialCost()
+    if (this.energy < cost) {
       this.pop(p.x, p.y - 130, 'Мало энергии', '#9aa0a6', 16)
       return
     }
-    this.energy -= 50
+    this.energy -= cost
     p.attack = this.mkAttack('special', 0.45, 9, 9, 0, 0, 0, 0)
     p.state = 'attack'
     p.vx = 0
@@ -669,7 +791,7 @@ export class Game {
     })
     this.audio.special()
     this.shake = 5
-    this.pop(p.x, p.y - 140, 'РЭП-ВОЛНА!', GOLD, 26)
+    this.pop(p.x, p.y - 140, pick(RAP_SHOUTS), GOLD, 24)
   }
 
   private attackBox(f: Fighter, a: Attack) {
@@ -712,15 +834,16 @@ export class Game {
     if (e.state === 'down' && e.onGround && e.stateT > 0.15) return
     const def = e.def as EnemyDef
     const isBoss = def.behavior === 'boss'
-    const amount = Math.round(dmg * (this.gloveT > 0 ? 2 : 1))
+    const diff = DIFFICULTIES[this.difficulty]
+    const amount = Math.round(dmg * (this.gloveT > 0 ? 2 : 1) * (this.items.has('tagclub') ? 1.25 : 1))
     e.hp -= amount
     e.flashT = 0.1
     e.entering = false
     this.combo++
     this.comboT = 1.6
     this.maxCombo = Math.max(this.maxCombo, this.combo)
-    this.energy = Math.min(100, this.energy + 5)
-    this.score += amount * 10 * (1 + Math.min(this.combo, 20) * 0.05)
+    this.energy = Math.min(100, this.energy + 5 * (this.items.has('iphone') ? 1.8 : 1))
+    this.score += amount * 10 * (1 + Math.min(this.combo, 20) * 0.05) * diff.score
     const heavy = knock >= 300 || lift > 0
     const hx = e.x - dir * e.w * 0.6
     const hy = e.y - e.h * 0.62
@@ -742,16 +865,19 @@ export class Game {
       e.deadT = 0
       e.bubble = null
       this.kills++
-      this.score += def.score
-      this.pop(e.x, e.y - e.h - 10, `+${def.score}`, GOLD, 22)
+      const gain = Math.round(def.score * diff.score)
+      this.score += gain
+      this.pop(e.x, e.y - e.h - 10, `+${gain}`, GOLD, 22)
       if (isBoss) {
         this.audio.ko()
         this.shake = 16
         this.hitStop = 0.3
         this.pop(e.x, e.y - e.h - 50, 'K.O.!', '#e23636', 56)
         this.spawnConfetti(40)
-      } else if (Math.random() < 0.22) {
-        const kind: PickupKind = Math.random() < 0.6 ? 'kimbap' : Math.random() < 0.5 ? 'energy' : 'ramyeon'
+      } else if (Math.random() < 0.22 * diff.drop) {
+        const roll = Math.random()
+        const kind: PickupKind =
+          roll < 0.5 ? 'kimbap' : roll < 0.72 ? 'energy' : roll < 0.9 ? 'ramyeon' : 'chicken'
         this.pickups.push({ x: e.x, y: e.y - 40, vy: -420, kind, t: 0 })
       }
       return
@@ -781,6 +907,10 @@ export class Game {
   private damagePlayer(dmg: number, dir: Facing, knock: number, lift: number) {
     const p = this.player
     if (p.invulnT > 0 || p.state === 'dead' || p.state === 'down' || this.completeT > 0) return
+    if (this.dodgeT > 0) {
+      this.onDodgedHit()
+      return
+    }
     p.hp -= dmg
     p.flashT = 0.12
     this.combo = 0
@@ -869,8 +999,8 @@ export class Game {
       facing: side > 0 ? -1 : 1,
       onGround: true,
       dropT: 0,
-      hp: def.hp,
-      maxHp: def.hp,
+      hp: Math.round(def.hp * DIFFICULTIES[this.difficulty].enemyHp),
+      maxHp: Math.round(def.hp * DIFFICULTIES[this.difficulty].enemyHp),
       state: 'walk',
       stateT: 0,
       attack: null,
@@ -925,6 +1055,7 @@ export class Game {
     const adx = Math.abs(dx)
     const dy = p.y - e.y
     const reach = def.range * e.scale + e.w
+    const spd = def.speed * DIFFICULTIES[this.difficulty].enemySpeed
     e.cooldown -= dt
 
     if (e.attack) {
@@ -938,7 +1069,7 @@ export class Game {
       const inside = e.x > this.camX + 40 && e.x < this.camX + W - 40
       if (inside) e.entering = false
       e.facing = e.x < this.camX + W / 2 ? 1 : -1
-      e.vx = e.facing * def.speed
+      e.vx = e.facing * spd
       e.state = 'walk'
       this.physics(e, dt)
       return
@@ -984,7 +1115,7 @@ export class Game {
       return
     }
     const wobble = def.id === 'drunk' ? Math.sin(e.animT * 3) * 0.5 : 0
-    e.vx = approach(e.vx, (move + (move ? wobble : 0)) * def.speed, 1600 * dt)
+    e.vx = approach(e.vx, (move + (move ? wobble : 0)) * spd, 1600 * dt)
     e.state = e.onGround ? (Math.abs(e.vx) > 10 ? 'walk' : 'idle') : 'jump'
     this.physics(e, dt)
     this.clampEnemy(e)
@@ -1005,7 +1136,7 @@ export class Game {
   private enemyStrike(e: Fighter) {
     const def = e.def as EnemyDef
     const wind = def.behavior === 'boss' ? 0.5 : 0.42
-    e.attack = this.mkAttack('strike', wind + 0.3, wind, wind + 0.12, def.range, def.damage, 200, 0)
+    e.attack = this.mkAttack('strike', wind + 0.3, wind, wind + 0.12, def.range, this.eDmg(def.damage), 200, 0)
     e.state = 'attack'
     this.say(e, 0.15)
   }
@@ -1018,7 +1149,7 @@ export class Game {
 
   private enemyCharge(e: Fighter) {
     const def = e.def as EnemyDef
-    e.attack = this.mkAttack('charge', 1.25, 0.55, 1.1, def.range, def.damage, 380, 320)
+    e.attack = this.mkAttack('charge', 1.25, 0.55, 1.1, def.range, this.eDmg(def.damage), 380, 320)
     e.state = 'attack'
     this.pop(e.x, e.y - e.h - 20, '!', '#e23636', 40)
     this.say(e, 0.4)
@@ -1026,7 +1157,7 @@ export class Game {
 
   private enemySlam(e: Fighter) {
     const def = e.def as EnemyDef
-    e.attack = this.mkAttack('slam', 0.95, 0.55, 0.68, def.range + 22, def.damage + 3, 360, 360)
+    e.attack = this.mkAttack('slam', 0.95, 0.55, 0.68, def.range + 22, this.eDmg(def.damage + 3), 360, 360)
     e.state = 'attack'
   }
 
@@ -1065,7 +1196,7 @@ export class Game {
       e.attack = null
       e.state = 'idle'
       const isBoss = (e.def as EnemyDef).behavior === 'boss'
-      e.cooldown = isBoss ? rand(0.5, 1.1) : rand(0.9, 1.8)
+      e.cooldown = (isBoss ? rand(0.5, 1.1) : rand(0.9, 1.8)) * DIFFICULTIES[this.difficulty].cooldown
     }
   }
 
@@ -1081,7 +1212,7 @@ export class Game {
     const g = floaty ? 260 : PROJ_G
     const speeds = isBoss ? [0.75, 1, 1.25] : [1]
     for (const k of speeds) {
-      const speed = (kind === 'bottle' || kind === 'wrench' ? 430 : 380) * k
+      const speed = (kind === 'bottle' || kind === 'wrench' || kind === 'brick' ? 430 : 380) * k
       const dist = Math.max(80, Math.abs(p.x - sx))
       const t = dist / speed
       const ty = p.y - 55
@@ -1094,7 +1225,7 @@ export class Game {
         g,
         kind,
         fromPlayer: false,
-        dmg: Math.round(def.damage * (isBoss ? 0.7 : 1)),
+        dmg: this.eDmg(def.damage * (isBoss ? 0.7 : 1)),
         life: 3.5,
         rot: 0,
         vr: e.facing * (floaty ? 4 : 11),
@@ -1128,8 +1259,12 @@ export class Game {
         if (pr.x < this.camX - 120 || pr.x > this.camX + W + 120) pr.life = 0
       } else {
         if (Math.abs(p.x - pr.x) < p.w + 10 && pr.y > p.y - p.h && pr.y < p.y + 4 && p.invulnT <= 0 && p.state !== 'down' && p.state !== 'dead') {
-          this.damagePlayer(pr.dmg, (pr.vx > 0 ? 1 : -1) as Facing, 200, 0)
-          pr.life = 0
+          if (this.dodgeT > 0) {
+            this.onDodgedHit()
+          } else {
+            this.damagePlayer(pr.dmg, (pr.vx > 0 ? 1 : -1) as Facing, 200, 0)
+            pr.life = 0
+          }
         }
         if (pr.y >= GROUND - 4) {
           pr.life = 0
@@ -1164,9 +1299,30 @@ export class Game {
       if (!hit) return true
       if (k.kind === 'kimbap') p.hp = Math.min(p.maxHp, p.hp + 30)
       if (k.kind === 'ramyeon') p.hp = Math.min(p.maxHp, p.hp + 60)
+      if (k.kind === 'chicken') p.hp = Math.min(p.maxHp, p.hp + 100)
       if (k.kind === 'energy') this.energy = 100
       if (k.kind === 'glove') this.gloveT = 10
-      this.pop(p.x, p.y - 140, PICKUP_LABEL[k.kind], k.kind === 'glove' ? GOLD : '#7CFC9A', 20)
+      if (isItem(k.kind)) {
+        this.items.add(k.kind)
+        if (k.kind === 'supreme') {
+          p.maxHp += 30
+          p.hp += 30
+        }
+        if (k.kind === 'tagclub') {
+          p.look = {
+            ...PLAYER_LOOK,
+            skin: PLAYER_SKIN_BY_DIFFICULTY[this.difficulty],
+            top: '#c4512f',
+            trim: '#f5c518',
+          }
+        }
+        this.pop(p.x, p.y - 150, `${ITEM_INFO[k.kind].name}!`, GOLD, 26)
+        this.pop(p.x, p.y - 122, ITEM_INFO[k.kind].effect, '#ffffff', 16)
+        this.spawnConfetti(18)
+        this.sparks(p.x, p.y - 60, 14, GOLD)
+      } else {
+        this.pop(p.x, p.y - 140, PICKUP_LABEL[k.kind], k.kind === 'glove' ? GOLD : '#7CFC9A', 20)
+      }
       this.sparks(k.x, k.y - 18, 10, GOLD)
       this.audio.pickup()
       this.score += 50
@@ -1208,6 +1364,8 @@ export class Game {
       p.rot += p.vr * dt
     }
     this.particles = this.particles.filter((p) => p.life > 0)
+    for (const g of this.ghosts) g.life -= dt
+    this.ghosts = this.ghosts.filter((g) => g.life > 0)
     for (const t of this.pops) {
       t.life -= dt
       t.y -= 40 * dt
@@ -1310,6 +1468,20 @@ export class Game {
     const all = [...this.enemies].sort((a, b) => (a.state === 'dead' ? -1 : 0) - (b.state === 'dead' ? -1 : 0))
     all.push(this.player)
     for (const f of all) this.drawShadow(f)
+    const ghostPose = poseFor({ state: 'dodge', animT: 0, vy: 0, angry: false })
+    for (const g of this.ghosts) {
+      drawFighter(ctx, {
+        x: g.x,
+        y: g.y,
+        facing: g.facing,
+        scale: 1,
+        look: this.player.look,
+        pose: ghostPose,
+        alpha: Math.max(0, g.life / 0.28) * 0.35,
+        flash: false,
+        roll: g.roll,
+      })
+    }
     for (const f of all) this.drawFighterEntity(f)
     for (const pr of this.projectiles) drawProjectile(ctx, pr.kind, pr.x, pr.y, pr.rot, pr.vx >= 0 ? 1 : -1, pr.t)
     this.drawParticles()
@@ -1448,6 +1620,11 @@ export class Game {
       this.ctx.fill()
       this.ctx.restore()
     }
+    let roll = 0
+    if (f.isPlayer && this.dodgeT > 0) {
+      alpha = Math.min(alpha, 0.75)
+      roll = this.rollAngle()
+    }
     drawFighter(this.ctx, {
       x: f.x,
       y: f.y,
@@ -1456,6 +1633,7 @@ export class Game {
       look: f.look,
       pose,
       alpha,
+      roll,
       flash: f.flashT > 0,
       goldFists: f.isPlayer && this.gloveT > 0,
     })
@@ -1597,7 +1775,7 @@ export class Game {
 
     this.text('ДАВИД', 92, 28, 18, '#ffffff', 'left', true, 4)
     this.bar(92, 42, 196, 16, p.hp / p.maxHp, p.hp < 30 ? '#ff4d4d' : '#e23636')
-    const ready = this.energy >= 50
+    const ready = this.energy >= this.specialCost()
     this.bar(92, 63, 196, 11, this.energy / 100, ready && Math.floor(this.clock * 4) % 2 === 0 ? '#ffe36b' : GOLD)
     if (ready) this.text('L — РЭП-ВОЛНА', 296, 28, 12, GOLD, 'right', false, 3)
 
@@ -1606,7 +1784,23 @@ export class Game {
       this.text(`x2 ${Math.ceil(this.gloveT)}с`, 356, 54, 14, GOLD, 'left', true, 3)
     }
 
+    const dodgeK = this.dodgeCd > 0 ? 1 - this.dodgeCd / (DODGE_CD + this.dodgeDur * 0.5) : 1
+    const dodgeReady = dodgeK >= 1
+    this.text('УВОРОТ', 16, 106, 12, dodgeReady ? '#7CFC9A' : '#9aa0a6', 'left', false, 3)
+    this.bar(72, 100, 70, 11, dodgeK, dodgeReady ? '#7CFC9A' : '#9aa0a6')
+    let ix = 170
+    for (const kind of ITEM_KINDS) {
+      if (!this.items.has(kind)) continue
+      ctx.save()
+      ctx.translate(ix, 106)
+      ctx.scale(0.55, 0.55)
+      drawPickup(ctx, kind, 0, 18, 0)
+      ctx.restore()
+      ix += 30
+    }
+
     this.text(`${this.level.number}. ${this.level.title}`, W / 2, 28, 18, '#ffffff', 'center', true, 4)
+    this.text(`Сложность: ${DIFFICULTIES[this.difficulty].name}`, W / 2, 50, 13, '#d0d0d0', 'center', false, 3)
     this.text(String(Math.round(this.score)).padStart(6, '0'), W - 20, 30, 26, GOLD, 'right', true, 5)
     this.text('СЧЁТ', W - 20, 54, 12, '#ffffff', 'right', false, 3)
     if (this.combo >= 3) {

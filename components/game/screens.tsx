@@ -4,6 +4,7 @@ import { Home, Play, RotateCcw, SkipForward } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { BIRTHDAY } from '@/lib/game/config'
+import { DIFFICULTIES, DIFFICULTY_LIST, type Difficulty } from '@/lib/game/difficulty'
 import type { GameInfo } from '@/lib/game/engine'
 import { LEVELS } from '@/lib/game/levels'
 
@@ -21,13 +22,14 @@ function Stats({ info }: { info: GameInfo }) {
   const minutes = Math.floor(info.time / 60)
   const seconds = Math.floor(info.time % 60)
   const items = [
+    { label: 'Сложность', value: DIFFICULTIES[info.difficulty].name },
     { label: 'Счёт', value: info.score.toLocaleString('ru-RU') },
     { label: 'Побеждено', value: info.kills },
     { label: 'Макс. комбо', value: info.maxCombo },
     { label: 'Время', value: `${minutes}:${String(seconds).padStart(2, '0')}` },
   ]
   return (
-    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
       {items.map((s) => (
         <div key={s.label} className="rounded-lg border border-border bg-card/80 px-3 py-2">
           <dt className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.label}</dt>
@@ -69,6 +71,52 @@ export function TitleScreen({ onStart }: { onStart: (level: number) => void }) {
         ))}
       </div>
       <p className="hidden text-xs text-white/60 sm:block">Нажми Enter, чтобы начать</p>
+    </div>
+  )
+}
+
+export function DifficultyScreen({
+  level,
+  onPick,
+  onBack,
+}: {
+  level: number
+  onPick: (d: Difficulty) => void
+  onBack: () => void
+}) {
+  return (
+    <div className="absolute inset-0 overflow-y-auto bg-gradient-to-b from-black/75 via-black/60 to-black/85 p-4">
+      <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center gap-3 text-center sm:gap-4">
+        <p className="text-xs uppercase tracking-[0.3em] text-primary">Уровень {LEVELS[level].number}</p>
+        <h2 className="font-display text-3xl text-white drop-shadow-[0_3px_0_#000] sm:text-5xl">Выбери сложность</h2>
+        <div className="grid w-full gap-2 sm:grid-cols-3 sm:gap-3">
+          {DIFFICULTY_LIST.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => onPick(d.id)}
+              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-white/20 bg-black/70 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary focus-visible:outline-2 focus-visible:outline-primary sm:p-4"
+            >
+              <span
+                aria-hidden="true"
+                className="size-8 rounded-full border-2 border-white/60 shadow-[0_3px_0_#000] sm:size-12"
+                style={{ backgroundColor: d.swatch }}
+              />
+              <span className="font-display text-xl text-white group-hover:text-primary sm:text-2xl">{d.name}</span>
+              <span className="text-pretty text-center text-xs text-white/75 sm:text-sm">{d.blurb}</span>
+              <ul className="hidden w-full flex-col gap-0.5 text-[11px] text-white/60 sm:flex">
+                {d.points.map((p) => (
+                  <li key={p}>· {p}</li>
+                ))}
+              </ul>
+            </button>
+          ))}
+        </div>
+        <Button variant="outline" size="sm" className="gap-2" onClick={onBack}>
+          <Home className="size-4" />
+          Назад
+        </Button>
+      </div>
     </div>
   )
 }

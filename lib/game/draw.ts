@@ -1,9 +1,11 @@
+import { isItem } from './items'
 import type { Facing, Look, PickupKind, ProjectileKind } from './types'
 
 export const OUTLINE = '#141414'
 export const GOLD = '#f5c518'
+export const SUPREME_RED = '#d6212b'
 
-export type FState = 'idle' | 'walk' | 'jump' | 'attack' | 'hurt' | 'down' | 'dead' | 'dance'
+export type FState = 'idle' | 'walk' | 'jump' | 'attack' | 'hurt' | 'down' | 'dead' | 'dance' | 'dodge'
 export type AttackKind =
   | 'punch'
   | 'punch3'
@@ -77,6 +79,8 @@ export function poseFor(p: {
       return { ...base, legF: 0.95, legB: -0.35, armF: 2.6, armB: 2.8, bob: 0, lean: p.vy < 0 ? -0.05 : 0.08 }
     case 'hurt':
       return { ...base, lean: -0.35, eyes: 'x', mouth: 'open', armF: 2.7, armB: 2.9, legF: 0.35, bob: 0 }
+    case 'dodge':
+      return { ...base, lean: 0.3, armF: 2.9, armB: 2.9, legF: 1.3, legB: -0.9, legFLen: 22, eyes: 'angry', bob: 0 }
     case 'down':
     case 'dead':
       return { ...base, lying: true, eyes: 'x', mouth: 'open', armF: 2.9, armB: 3.0, legF: 0.2, legB: -0.1, bob: 0 }
@@ -232,6 +236,20 @@ function drawHairFront(ctx: CanvasRenderingContext2D, look: Look) {
       ctx.closePath()
       strokeFill(ctx, look.hair)
       break
+    case 'wavy':
+      hairCap(ctx, look.hair)
+      for (const [dx, dy, r] of [
+        [-21, -105, 8],
+        [-11, -111, 8],
+        [1, -114, 9],
+        [13, -111, 8],
+        [23, -104, 7],
+        [-27, -96, 6],
+        [29, -96, 6],
+      ]) {
+        circle(ctx, HX + dx, dy, r, look.hair, 1.5)
+      }
+      break
     case 'buzz':
       ctx.beginPath()
       ctx.arc(HX, HY, HR + 1, Math.PI * 1.02, Math.PI * 1.98)
@@ -277,6 +295,20 @@ function drawHairFront(ctx: CanvasRenderingContext2D, look: Look) {
 }
 
 function drawFace(ctx: CanvasRenderingContext2D, look: Look, pose: Pose) {
+  if (look.acc.includes('beard')) {
+    const sx = HX + Math.cos(Math.PI * 0.05) * (HR - 0.5)
+    const sy = HY + Math.sin(Math.PI * 0.05) * (HR - 0.5)
+    ctx.beginPath()
+    ctx.arc(HX, HY, HR - 0.5, Math.PI * 0.05, Math.PI * 0.95)
+    ctx.quadraticCurveTo(HX, HY + 6, sx, sy)
+    ctx.closePath()
+    ctx.fillStyle = look.hair
+    ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(HX + 15, HY + 10, 8, 5.5, 0, 0, Math.PI * 2)
+    ctx.fillStyle = shade(look.skin, 0.05)
+    ctx.fill()
+  }
   const ey = HY - 1
   const eyes = [HX + 8, HX + 18]
   ctx.fillStyle = OUTLINE
@@ -377,6 +409,25 @@ function drawHats(ctx: CanvasRenderingContext2D, look: Look) {
     ctx.fillStyle = GOLD
     ctx.fill()
   }
+  if (look.acc.includes('doppi')) {
+    ctx.beginPath()
+    ctx.moveTo(HX - HR * 0.98, HY - HR * 0.4)
+    ctx.quadraticCurveTo(HX - HR * 0.95, HY - HR * 1.35, HX, HY - HR * 1.3)
+    ctx.quadraticCurveTo(HX + HR * 0.95, HY - HR * 1.35, HX + HR * 0.98, HY - HR * 0.4)
+    ctx.closePath()
+    strokeFill(ctx, '#0b0b0b')
+    ctx.fillStyle = '#f4f4f4'
+    for (let i = 0; i < 5; i++) {
+      const dx = HX - 18 + i * 9
+      ctx.beginPath()
+      ctx.moveTo(dx, HY - HR * 0.78)
+      ctx.lineTo(dx + 3.5, HY - HR * 0.62)
+      ctx.lineTo(dx, HY - HR * 0.46)
+      ctx.lineTo(dx - 3.5, HY - HR * 0.62)
+      ctx.closePath()
+      ctx.fill()
+    }
+  }
   if (look.acc.includes('flatcap')) {
     ctx.beginPath()
     ctx.ellipse(HX + 2, HY - HR * 0.62, HR + 4, HR * 0.48, 0, Math.PI, Math.PI * 2)
@@ -385,6 +436,19 @@ function drawHats(ctx: CanvasRenderingContext2D, look: Look) {
     ctx.beginPath()
     ctx.ellipse(HX + HR * 0.85, HY - HR * 0.6, 13, 4, 0.1, 0, Math.PI * 2)
     strokeFill(ctx, '#2c2c2c', 2.5)
+  }
+  if (look.acc.includes('supreme')) {
+    ctx.beginPath()
+    ctx.arc(HX, HY - 3, HR + 2, Math.PI, Math.PI * 2)
+    ctx.closePath()
+    strokeFill(ctx, SUPREME_RED)
+    roundRect(ctx, HX + 6, HY - 10, 26, 6, 3)
+    strokeFill(ctx, SUPREME_RED, 2.5)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold italic 9px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('S', HX + 4, HY - HR * 0.55)
   }
   if (look.acc.includes('visor')) {
     roundRect(ctx, HX - HR + 2, HY - HR * 0.75, HR * 2 - 2, 6, 3)
@@ -484,6 +548,20 @@ function drawTorso(ctx: CanvasRenderingContext2D, look: Look) {
     ctx.lineTo(4, -27)
     ctx.stroke()
   }
+  if (a.includes('supreme')) {
+    roundRect(ctx, -10, -58, 22, 11, 1)
+    strokeFill(ctx, SUPREME_RED, 1.5)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold italic 7px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('Supreme', 1, -52)
+    roundRect(ctx, -18, -34, 36, 10, 2)
+    strokeFill(ctx, SUPREME_RED, 2)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 6px sans-serif'
+    ctx.fillText('SUPREME  SUPREME', 0, -29)
+  }
   if (a.includes('hood')) {
     roundRect(ctx, -9, -43, 20, 11, 4)
     ctx.fillStyle = shade(look.top, 0.12)
@@ -558,10 +636,13 @@ export interface FighterDraw {
   alpha?: number
   flash?: boolean
   goldFists?: boolean
+  roll?: number
 }
 
 export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
   const { look, pose } = d
+  const slim = look.slim ?? 1
+  const wide = look.wide ?? 1
   ctx.save()
   ctx.globalAlpha = d.alpha ?? 1
   ctx.translate(d.x, d.y)
@@ -574,6 +655,11 @@ export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
     ctx.translate(0, -30)
     ctx.rotate(pose.lean)
     ctx.translate(0, 30)
+    if (d.roll) {
+      ctx.translate(0, -45)
+      ctx.rotate(d.roll)
+      ctx.translate(0, 45)
+    }
   }
   if (d.flash) ctx.filter = 'brightness(2.2) saturate(0.4)'
 
@@ -582,23 +668,41 @@ export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
   const pantsB = shade(look.pants, -0.25)
   const fist = d.goldFists ? GOLD : look.skin
 
-  const backEnd = limb(ctx, -3, -54, pose.armB, 20, 9, topB, stripe)
+  const short = look.acc.includes('shortsleeve')
+  if (look.acc.includes('backpack')) {
+    roundRect(ctx, -25, -61, 18, 31, 6)
+    strokeFill(ctx, '#171719', 2.5)
+    ctx.strokeStyle = '#77787b'
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.moveTo(-17, -59)
+    ctx.quadraticCurveTo(-8, -63, -7, -53)
+    ctx.moveTo(-17, -31)
+    ctx.quadraticCurveTo(-7, -31, -7, -42)
+    ctx.stroke()
+  }
+  const backEnd = limb(ctx, -3, -54, pose.armB, 20, 9 * slim * wide, short ? shade(look.skin, -0.12) : topB, stripe)
+  if (short) limb(ctx, -3, -54, pose.armB, 9, 10.5 * slim * wide, topB)
   circle(ctx, backEnd[0], backEnd[1], 6, d.goldFists ? GOLD : shade(look.skin, -0.12), 2.5)
 
-  const lb = limb(ctx, -5, -30, pose.legB, 27, 11, pantsB, stripe)
+  const lb = limb(ctx, -5, -30, pose.legB, 27, 11 * slim * wide, pantsB, stripe)
   ctx.beginPath()
   ctx.ellipse(lb[0] + 3, lb[1] + 1, 8, 5, 0, 0, Math.PI * 2)
   strokeFill(ctx, shade(look.shoes, -0.15), 2.5)
 
-  const lf = limb(ctx, 5, -30, pose.legF, pose.legFLen, 11, look.pants, stripe)
+  const lf = limb(ctx, 5, -30, pose.legF, pose.legFLen, 11 * slim * wide, look.pants, stripe)
   ctx.beginPath()
   ctx.ellipse(lf[0] + 3, lf[1] + 1, 8.5, 5.5, 0, 0, Math.PI * 2)
   strokeFill(ctx, look.shoes, 2.5)
 
+  ctx.save()
+  ctx.scale(slim * wide, 1)
   drawTorso(ctx, look)
+  ctx.restore()
   drawHead(ctx, look, pose)
 
-  const frontEnd = limb(ctx, 5, -54, pose.armF, pose.armFLen, 9, look.top, stripe)
+  const frontEnd = limb(ctx, 5, -54, pose.armF, pose.armFLen, 9 * slim * wide, short ? look.skin : look.top, stripe)
+  if (short) limb(ctx, 5, -54, pose.armF, 9, 10.5 * slim * wide, look.top)
   if (d.goldFists) {
     ctx.save()
     ctx.shadowColor = GOLD
@@ -619,9 +723,86 @@ export function drawPickup(ctx: CanvasRenderingContext2D, kind: PickupKind, x: n
   ctx.translate(x, y - 18 + bob)
   ctx.beginPath()
   ctx.arc(0, 0, 22, 0, Math.PI * 2)
-  ctx.fillStyle = kind === 'glove' ? 'rgba(245,197,24,0.3)' : 'rgba(255,255,255,0.22)'
+  ctx.fillStyle = kind === 'glove' || isItem(kind) ? 'rgba(245,197,24,0.3)' : 'rgba(255,255,255,0.22)'
   ctx.fill()
   switch (kind) {
+    case 'iphone':
+      for (const [dx, rot, body] of [
+        [-5, -0.18, '#3b3f47'],
+        [6, 0.14, '#c9ccd2'],
+      ] as const) {
+        ctx.save()
+        ctx.translate(dx, 0)
+        ctx.rotate(rot)
+        roundRect(ctx, -6, -13, 12, 24, 3)
+        strokeFill(ctx, body, 2)
+        ctx.fillStyle = '#0b0b0d'
+        for (const [cx, cy] of [
+          [-2.2, -9],
+          [2.2, -9],
+          [0, -5.5],
+        ]) {
+          ctx.beginPath()
+          ctx.arc(cx, cy, 1.5, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.restore()
+      }
+      break
+    case 'supreme':
+      ctx.beginPath()
+      ctx.moveTo(-12, -5)
+      ctx.lineTo(12, -5)
+      ctx.lineTo(13, 11)
+      ctx.lineTo(3, 11)
+      ctx.lineTo(0, 3)
+      ctx.lineTo(-3, 11)
+      ctx.lineTo(-13, 11)
+      ctx.closePath()
+      strokeFill(ctx, '#ffffff', 2.5)
+      roundRect(ctx, -13, -11, 26, 7, 2)
+      strokeFill(ctx, SUPREME_RED, 2.5)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold italic 6px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('Supreme', 0, -7)
+      break
+    case 'tagclub':
+      roundRect(ctx, -17, -3, 8, 16, 3)
+      strokeFill(ctx, '#b8452a', 2.5)
+      roundRect(ctx, 9, -3, 8, 16, 3)
+      strokeFill(ctx, '#b8452a', 2.5)
+      roundRect(ctx, -11, -8, 22, 21, 4)
+      strokeFill(ctx, '#d9593a', 2.5)
+      ctx.beginPath()
+      ctx.arc(0, -8, 6, 0, Math.PI)
+      strokeFill(ctx, '#b8452a', 2)
+      ctx.strokeStyle = '#6e1f12'
+      ctx.lineWidth = 1.8
+      ctx.beginPath()
+      ctx.arc(-3.5, 4, 3.6, Math.PI * 0.55, Math.PI * 1.6)
+      ctx.stroke()
+      ctx.fillStyle = '#6e1f12'
+      ctx.beginPath()
+      ctx.moveTo(4.5, -1)
+      ctx.lineTo(6, 4)
+      ctx.lineTo(4.5, 9)
+      ctx.lineTo(3, 4)
+      ctx.closePath()
+      ctx.fill()
+      break
+    case 'cap':
+      ctx.beginPath()
+      ctx.arc(-1, 3, 12, Math.PI, Math.PI * 2)
+      ctx.closePath()
+      strokeFill(ctx, '#f1ead6', 2.5)
+      roundRect(ctx, 2, 1, 17, 6, 3)
+      strokeFill(ctx, '#1a1a1a', 2.5)
+      ctx.fillStyle = '#1a1a1a'
+      ctx.fillRect(-9, -2, 14, 2)
+      ctx.fillRect(-7, -6, 10, 2)
+      break
     case 'kimbap':
       for (const dx of [-7, 7]) {
         circle(ctx, dx, 0, 9, '#1f2a1f', 2.5)
@@ -636,6 +817,43 @@ export function drawPickup(ctx: CanvasRenderingContext2D, kind: PickupKind, x: n
         ctx.fillStyle = '#f2c94c'
         ctx.fillRect(dx - 2, 1, 3, 3)
       }
+      break
+    case 'chicken':
+      ctx.save()
+      ctx.scale(1.42, 1.42)
+      ctx.fillStyle = '#f5eee2'
+      ctx.beginPath()
+      ctx.moveTo(-17, 1)
+      ctx.lineTo(17, 1)
+      ctx.lineTo(13, 15)
+      ctx.lineTo(-13, 15)
+      ctx.closePath()
+      strokeFill(ctx, '#d6c8b3', 2)
+      for (const [cx, cy, rx, ry, rot] of [
+        [-8, -8, 10, 9, -0.3],
+        [5, -10, 10, 9, 0.4],
+        [-1, 3, 10, 8, -0.15],
+      ]) {
+        ctx.beginPath()
+        ctx.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2)
+        strokeFill(ctx, '#c87826', 2)
+        ctx.fillStyle = '#e7a33f'
+        for (const [dx, dy, r] of [
+          [-5, -3, 2],
+          [2, -5, 1.7],
+          [5, 1, 2],
+          [-2, 4, 1.5],
+        ]) {
+          ctx.beginPath()
+          ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.fillStyle = 'rgba(255,232,173,0.72)'
+        ctx.beginPath()
+        ctx.ellipse(cx - 3, cy - 4, 4, 2, -0.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.restore()
       break
     case 'ramyeon':
       ctx.beginPath()
@@ -751,6 +969,24 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, kind: ProjectileKi
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText('1+1', 0, 1)
+      break
+    case 'brick':
+      roundRect(ctx, -18, -9, 36, 18, 2)
+      strokeFill(ctx, SUPREME_RED, 2.5)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold italic 9px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('Supreme', 0, 1)
+      break
+    case 'phone':
+      roundRect(ctx, -7, -12, 14, 24, 3)
+      strokeFill(ctx, '#c9ccd2', 2.5)
+      roundRect(ctx, -5, -10, 10, 20, 2)
+      ctx.fillStyle = '#16181c'
+      ctx.fill()
+      ctx.fillStyle = '#6fb7ff'
+      ctx.fillRect(-3, -3, 6, 8)
       break
   }
   ctx.restore()

@@ -12,7 +12,7 @@ export default function Page() {
           </h1>
         </div>
         <p className="max-w-sm text-sm text-muted-foreground md:text-right">
-          Россия → 경기기계공고 → Универ → 7-Eleven. Пройди весь путь и забери поздравление в конце.
+          Россия → 경기기계공고 → Универ → 7-Eleven → 압구정로데오. Пройди весь путь и забери поздравление в конце.
         </p>
       </header>
       <GameShell />
