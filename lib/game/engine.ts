@@ -168,6 +168,12 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 const approach = (v: number, target: number, d: number) =>
   v < target ? Math.min(target, v + d) : Math.max(target, v - d)
 
+const PLAYER_SKIN_BY_DIFFICULTY: Record<Difficulty, string> = {
+  white: '#f3dfd0',
+  chocolate: '#9b6545',
+  black: '#493027',
+}
+
 const PICKUP_LABEL: Record<PickupKind, string> = {
   kimbap: '+30 HP Кимбап',
   ramyeon: '+60 HP Рамён',
@@ -402,7 +408,11 @@ export class Game {
       id: 0,
       isPlayer: true,
       def: null,
-      look: this.items.has('tagclub') ? { ...PLAYER_LOOK, top: '#c4512f', trim: '#f5c518' } : PLAYER_LOOK,
+      look: {
+        ...PLAYER_LOOK,
+        skin: PLAYER_SKIN_BY_DIFFICULTY[this.difficulty],
+        ...(this.items.has('tagclub') ? { top: '#c4512f', trim: '#f5c518' } : {}),
+      },
       x: 140,
       y: GROUND,
       vx: 0,
@@ -1298,7 +1308,14 @@ export class Game {
           p.maxHp += 30
           p.hp += 30
         }
-        if (k.kind === 'tagclub') p.look = { ...PLAYER_LOOK, top: '#c4512f', trim: '#f5c518' }
+        if (k.kind === 'tagclub') {
+          p.look = {
+            ...PLAYER_LOOK,
+            skin: PLAYER_SKIN_BY_DIFFICULTY[this.difficulty],
+            top: '#c4512f',
+            trim: '#f5c518',
+          }
+        }
         this.pop(p.x, p.y - 150, `${ITEM_INFO[k.kind].name}!`, GOLD, 26)
         this.pop(p.x, p.y - 122, ITEM_INFO[k.kind].effect, '#ffffff', 16)
         this.spawnConfetti(18)
