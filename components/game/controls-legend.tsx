@@ -1,3 +1,5 @@
+import { ITEM_INFO, ITEM_KINDS } from '@/lib/game/items'
+
 const CONTROLS = [
   { keys: ['A', 'D'], alt: '← →', label: 'Ходить' },
   { keys: ['W'], alt: 'Пробел', label: 'Прыжок' },
@@ -5,6 +7,7 @@ const CONTROLS = [
   { keys: ['J'], alt: 'Z', label: 'Удар (x3 — комбо)' },
   { keys: ['K'], alt: 'X', label: 'Пинок (в прыжке — с воздуха)' },
   { keys: ['L'], alt: 'C', label: 'Рэп-волна (50 энергии)' },
+  { keys: ['Shift'], alt: 'V', label: 'Уворот — неуязвимость на миг' },
   { keys: ['Esc'], alt: 'P', label: 'Пауза' },
 ]
 
@@ -14,6 +17,8 @@ const PICKUPS = [
   { name: 'Энергетик', effect: 'полная энергия' },
   { name: 'Перчатка силы', effect: 'x2 урон на 10 сек' },
 ]
+
+const SPECIAL_ITEMS = ITEM_KINDS.map((k) => ITEM_INFO[k])
 
 function Kbd({ children }: { children: string }) {
   return (
@@ -55,6 +60,15 @@ export function ControlsLegend() {
             <li key={p.name} className="flex justify-between gap-2">
               <span>{p.name}</span>
               <span className="text-muted-foreground">{p.effect}</span>
+            </li>
+          ))}
+        </ul>
+        <h2 className="mb-3 mt-4 font-display text-lg text-primary">Особые предметы</h2>
+        <ul className="flex flex-col gap-2 text-sm">
+          {SPECIAL_ITEMS.map((p) => (
+            <li key={p.name} className="flex flex-col">
+              <span>{p.name}</span>
+              <span className="text-xs text-muted-foreground">{p.effect}</span>
             </li>
           ))}
         </ul>
