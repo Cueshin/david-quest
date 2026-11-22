@@ -236,6 +236,20 @@ function drawHairFront(ctx: CanvasRenderingContext2D, look: Look) {
       ctx.closePath()
       strokeFill(ctx, look.hair)
       break
+    case 'wavy':
+      hairCap(ctx, look.hair)
+      for (const [dx, dy, r] of [
+        [-21, -105, 8],
+        [-11, -111, 8],
+        [1, -114, 9],
+        [13, -111, 8],
+        [23, -104, 7],
+        [-27, -96, 6],
+        [29, -96, 6],
+      ]) {
+        circle(ctx, HX + dx, dy, r, look.hair, 1.5)
+      }
+      break
     case 'buzz':
       ctx.beginPath()
       ctx.arc(HX, HY, HR + 1, Math.PI * 1.02, Math.PI * 1.98)
@@ -655,6 +669,18 @@ export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
   const fist = d.goldFists ? GOLD : look.skin
 
   const short = look.acc.includes('shortsleeve')
+  if (look.acc.includes('backpack')) {
+    roundRect(ctx, -25, -61, 18, 31, 6)
+    strokeFill(ctx, '#171719', 2.5)
+    ctx.strokeStyle = '#77787b'
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.moveTo(-17, -59)
+    ctx.quadraticCurveTo(-8, -63, -7, -53)
+    ctx.moveTo(-17, -31)
+    ctx.quadraticCurveTo(-7, -31, -7, -42)
+    ctx.stroke()
+  }
   const backEnd = limb(ctx, -3, -54, pose.armB, 20, 9 * slim * wide, short ? shade(look.skin, -0.12) : topB, stripe)
   if (short) limb(ctx, -3, -54, pose.armB, 9, 10.5 * slim * wide, topB)
   circle(ctx, backEnd[0], backEnd[1], 6, d.goldFists ? GOLD : shade(look.skin, -0.12), 2.5)
@@ -794,31 +820,39 @@ export function drawPickup(ctx: CanvasRenderingContext2D, kind: PickupKind, x: n
       break
     case 'chicken':
       ctx.save()
-      ctx.rotate(-0.5)
+      ctx.scale(1.42, 1.42)
+      ctx.fillStyle = '#f5eee2'
       ctx.beginPath()
-      ctx.moveTo(4, 2)
-      ctx.lineTo(15, 2)
-      strokeFill(ctx, '#f6efe0', 4)
-      circle(ctx, 16, -1, 3.2, '#f6efe0', 2)
-      circle(ctx, 16, 5, 3.2, '#f6efe0', 2)
-      ctx.beginPath()
-      ctx.ellipse(-3, 1, 13, 10, 0, 0, Math.PI * 2)
-      strokeFill(ctx, '#d9822b')
-      ctx.fillStyle = '#e23a2a'
-      for (const [cx, cy, r] of [
-        [-8, -3, 2.4],
-        [-1, 4, 2.2],
-        [-3, -6, 1.8],
-        [3, -1, 1.8],
+      ctx.moveTo(-17, 1)
+      ctx.lineTo(17, 1)
+      ctx.lineTo(13, 15)
+      ctx.lineTo(-13, 15)
+      ctx.closePath()
+      strokeFill(ctx, '#d6c8b3', 2)
+      for (const [cx, cy, rx, ry, rot] of [
+        [-8, -8, 10, 9, -0.3],
+        [5, -10, 10, 9, 0.4],
+        [-1, 3, 10, 8, -0.15],
       ]) {
         ctx.beginPath()
-        ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        ctx.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2)
+        strokeFill(ctx, '#c87826', 2)
+        ctx.fillStyle = '#e7a33f'
+        for (const [dx, dy, r] of [
+          [-5, -3, 2],
+          [2, -5, 1.7],
+          [5, 1, 2],
+          [-2, 4, 1.5],
+        ]) {
+          ctx.beginPath()
+          ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.fillStyle = 'rgba(255,232,173,0.72)'
+        ctx.beginPath()
+        ctx.ellipse(cx - 3, cy - 4, 4, 2, -0.5, 0, Math.PI * 2)
         ctx.fill()
       }
-      ctx.fillStyle = 'rgba(255,230,160,0.7)'
-      ctx.beginPath()
-      ctx.ellipse(-8, -6, 4, 2, -0.5, 0, Math.PI * 2)
-      ctx.fill()
       ctx.restore()
       break
     case 'ramyeon':

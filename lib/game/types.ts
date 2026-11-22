@@ -1,6 +1,6 @@
 export type Facing = 1 | -1
 
-export type HairStyle = 'short' | 'buzz' | 'spiky' | 'long' | 'perm' | 'bald' | 'side'
+export type HairStyle = 'short' | 'buzz' | 'spiky' | 'wavy' | 'long' | 'perm' | 'bald' | 'side'
 
 export type Accessory =
   | 'chain'
@@ -24,6 +24,7 @@ export type Accessory =
   | 'beard'
   | 'doppi'
   | 'shortsleeve'
+  | 'backpack'
 
 export interface Look {
   slim?: number
