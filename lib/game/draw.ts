@@ -281,6 +281,20 @@ function drawHairFront(ctx: CanvasRenderingContext2D, look: Look) {
 }
 
 function drawFace(ctx: CanvasRenderingContext2D, look: Look, pose: Pose) {
+  if (look.acc.includes('beard')) {
+    const sx = HX + Math.cos(Math.PI * 0.05) * (HR - 0.5)
+    const sy = HY + Math.sin(Math.PI * 0.05) * (HR - 0.5)
+    ctx.beginPath()
+    ctx.arc(HX, HY, HR - 0.5, Math.PI * 0.05, Math.PI * 0.95)
+    ctx.quadraticCurveTo(HX, HY + 6, sx, sy)
+    ctx.closePath()
+    ctx.fillStyle = look.hair
+    ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(HX + 15, HY + 10, 8, 5.5, 0, 0, Math.PI * 2)
+    ctx.fillStyle = shade(look.skin, 0.05)
+    ctx.fill()
+  }
   const ey = HY - 1
   const eyes = [HX + 8, HX + 18]
   ctx.fillStyle = OUTLINE
@@ -380,6 +394,25 @@ function drawHats(ctx: CanvasRenderingContext2D, look: Look) {
     roundRect(ctx, HX - 6, HY - HR - 1, 12, 5, 2)
     ctx.fillStyle = GOLD
     ctx.fill()
+  }
+  if (look.acc.includes('doppi')) {
+    ctx.beginPath()
+    ctx.moveTo(HX - HR * 0.98, HY - HR * 0.4)
+    ctx.quadraticCurveTo(HX - HR * 0.95, HY - HR * 1.35, HX, HY - HR * 1.3)
+    ctx.quadraticCurveTo(HX + HR * 0.95, HY - HR * 1.35, HX + HR * 0.98, HY - HR * 0.4)
+    ctx.closePath()
+    strokeFill(ctx, '#0b0b0b')
+    ctx.fillStyle = '#f4f4f4'
+    for (let i = 0; i < 5; i++) {
+      const dx = HX - 18 + i * 9
+      ctx.beginPath()
+      ctx.moveTo(dx, HY - HR * 0.78)
+      ctx.lineTo(dx + 3.5, HY - HR * 0.62)
+      ctx.lineTo(dx, HY - HR * 0.46)
+      ctx.lineTo(dx - 3.5, HY - HR * 0.62)
+      ctx.closePath()
+      ctx.fill()
+    }
   }
   if (look.acc.includes('flatcap')) {
     ctx.beginPath()
@@ -621,7 +654,9 @@ export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
   const pantsB = shade(look.pants, -0.25)
   const fist = d.goldFists ? GOLD : look.skin
 
-  const backEnd = limb(ctx, -3, -54, pose.armB, 20, 9 * slim * wide, topB, stripe)
+  const short = look.acc.includes('shortsleeve')
+  const backEnd = limb(ctx, -3, -54, pose.armB, 20, 9 * slim * wide, short ? shade(look.skin, -0.12) : topB, stripe)
+  if (short) limb(ctx, -3, -54, pose.armB, 9, 10.5 * slim * wide, topB)
   circle(ctx, backEnd[0], backEnd[1], 6, d.goldFists ? GOLD : shade(look.skin, -0.12), 2.5)
 
   const lb = limb(ctx, -5, -30, pose.legB, 27, 11 * slim * wide, pantsB, stripe)
@@ -640,7 +675,8 @@ export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
   ctx.restore()
   drawHead(ctx, look, pose)
 
-  const frontEnd = limb(ctx, 5, -54, pose.armF, pose.armFLen, 9 * slim * wide, look.top, stripe)
+  const frontEnd = limb(ctx, 5, -54, pose.armF, pose.armFLen, 9 * slim * wide, short ? look.skin : look.top, stripe)
+  if (short) limb(ctx, 5, -54, pose.armF, 9, 10.5 * slim * wide, look.top)
   if (d.goldFists) {
     ctx.save()
     ctx.shadowColor = GOLD
@@ -755,6 +791,35 @@ export function drawPickup(ctx: CanvasRenderingContext2D, kind: PickupKind, x: n
         ctx.fillStyle = '#f2c94c'
         ctx.fillRect(dx - 2, 1, 3, 3)
       }
+      break
+    case 'chicken':
+      ctx.save()
+      ctx.rotate(-0.5)
+      ctx.beginPath()
+      ctx.moveTo(4, 2)
+      ctx.lineTo(15, 2)
+      strokeFill(ctx, '#f6efe0', 4)
+      circle(ctx, 16, -1, 3.2, '#f6efe0', 2)
+      circle(ctx, 16, 5, 3.2, '#f6efe0', 2)
+      ctx.beginPath()
+      ctx.ellipse(-3, 1, 13, 10, 0, 0, Math.PI * 2)
+      strokeFill(ctx, '#d9822b')
+      ctx.fillStyle = '#e23a2a'
+      for (const [cx, cy, r] of [
+        [-8, -3, 2.4],
+        [-1, 4, 2.2],
+        [-3, -6, 1.8],
+        [3, -1, 1.8],
+      ]) {
+        ctx.beginPath()
+        ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.fillStyle = 'rgba(255,230,160,0.7)'
+      ctx.beginPath()
+      ctx.ellipse(-8, -6, 4, 2, -0.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
       break
     case 'ramyeon':
       ctx.beginPath()

@@ -21,6 +21,9 @@ export type Accessory =
   | 'blazer'
   | 'plaid'
   | 'supreme'
+  | 'beard'
+  | 'doppi'
+  | 'shortsleeve'
 
 export interface Look {
   slim?: number
@@ -41,7 +44,7 @@ export type ProjectileKind = 'wave' | 'snowball' | 'wrench' | 'book' | 'exam' | 
 
 export type ItemKind = 'iphone' | 'supreme' | 'tagclub' | 'cap'
 
-export type PickupKind = 'kimbap' | 'ramyeon' | 'energy' | 'glove' | ItemKind
+export type PickupKind = 'kimbap' | 'ramyeon' | 'chicken' | 'energy' | 'glove' | ItemKind
 
 export interface EnemyDef {
   id: string

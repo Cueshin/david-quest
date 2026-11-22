@@ -171,6 +171,7 @@ const approach = (v: number, target: number, d: number) =>
 const PICKUP_LABEL: Record<PickupKind, string> = {
   kimbap: '+30 HP Кимбап',
   ramyeon: '+60 HP Рамён',
+  chicken: '+100 HP Чикин!',
   energy: 'Энергетик! Полная энергия',
   glove: 'Перчатка силы! x2 урон',
   iphone: ITEM_INFO.iphone.name,
@@ -864,7 +865,9 @@ export class Game {
         this.pop(e.x, e.y - e.h - 50, 'K.O.!', '#e23636', 56)
         this.spawnConfetti(40)
       } else if (Math.random() < 0.22 * diff.drop) {
-        const kind: PickupKind = Math.random() < 0.6 ? 'kimbap' : Math.random() < 0.5 ? 'energy' : 'ramyeon'
+        const roll = Math.random()
+        const kind: PickupKind =
+          roll < 0.5 ? 'kimbap' : roll < 0.72 ? 'energy' : roll < 0.9 ? 'ramyeon' : 'chicken'
         this.pickups.push({ x: e.x, y: e.y - 40, vy: -420, kind, t: 0 })
       }
       return
@@ -1286,6 +1289,7 @@ export class Game {
       if (!hit) return true
       if (k.kind === 'kimbap') p.hp = Math.min(p.maxHp, p.hp + 30)
       if (k.kind === 'ramyeon') p.hp = Math.min(p.maxHp, p.hp + 60)
+      if (k.kind === 'chicken') p.hp = Math.min(p.maxHp, p.hp + 100)
       if (k.kind === 'energy') this.energy = 100
       if (k.kind === 'glove') this.gloveT = 10
       if (isItem(k.kind)) {

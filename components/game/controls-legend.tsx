@@ -14,6 +14,7 @@ const CONTROLS = [
 const PICKUPS = [
   { name: 'Кимбап', effect: '+30 HP' },
   { name: 'Рамён', effect: '+60 HP' },
+  { name: 'Чикин', effect: '+100 HP' },
   { name: 'Энергетик', effect: 'полная энергия' },
   { name: 'Перчатка силы', effect: 'x2 урон на 10 сек' },
 ]
