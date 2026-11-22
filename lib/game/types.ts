@@ -24,6 +24,7 @@ export type Accessory =
 
 export interface Look {
   slim?: number
+  wide?: number
   skin: string
   hair: string
   hairStyle: HairStyle

@@ -6,7 +6,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Давид: Легенда 7-Eleven — С днём рождения!',
   description:
-    'Beat ’em up платформер на день рождения Давида: Россия, 경기기계공고, универ и ночная смена в 7-Eleven.',
+    'Beat ’em up платформер на день рождения Давида: Россия, 경기기계공고, универ, ночная смена в 7-Eleven и 압구정로데오.',
   generator: 'v0.app',
   icons: {
     icon: [

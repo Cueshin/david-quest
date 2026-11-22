@@ -13,7 +13,7 @@ import {
 } from './draw'
 import { DIFFICULTIES, type Difficulty } from './difficulty'
 import { ITEM_INFO, ITEM_KINDS, isItem } from './items'
-import { ENEMY_DEFS, HIT_WORDS, LEVELS, PLAYER_LOOK } from './levels'
+import { ENEMY_DEFS, HIT_WORDS, LEVELS, PLAYER_LOOK, RAP_SHOUTS } from './levels'
 import type { EnemyDef, Facing, ItemKind, LevelDef, Look, PickupKind, ProjectileKind } from './types'
 
 export const W = 960
@@ -780,7 +780,7 @@ export class Game {
     })
     this.audio.special()
     this.shake = 5
-    this.pop(p.x, p.y - 140, 'РЭП-ВОЛНА!', GOLD, 26)
+    this.pop(p.x, p.y - 140, pick(RAP_SHOUTS), GOLD, 24)
   }
 
   private attackBox(f: Fighter, a: Attack) {

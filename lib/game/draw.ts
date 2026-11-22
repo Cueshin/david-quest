@@ -595,6 +595,7 @@ export interface FighterDraw {
 export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
   const { look, pose } = d
   const slim = look.slim ?? 1
+  const wide = look.wide ?? 1
   ctx.save()
   ctx.globalAlpha = d.alpha ?? 1
   ctx.translate(d.x, d.y)
@@ -620,26 +621,26 @@ export function drawFighter(ctx: CanvasRenderingContext2D, d: FighterDraw) {
   const pantsB = shade(look.pants, -0.25)
   const fist = d.goldFists ? GOLD : look.skin
 
-  const backEnd = limb(ctx, -3, -54, pose.armB, 20, 9 * slim, topB, stripe)
+  const backEnd = limb(ctx, -3, -54, pose.armB, 20, 9 * slim * wide, topB, stripe)
   circle(ctx, backEnd[0], backEnd[1], 6, d.goldFists ? GOLD : shade(look.skin, -0.12), 2.5)
 
-  const lb = limb(ctx, -5, -30, pose.legB, 27, 11 * slim, pantsB, stripe)
+  const lb = limb(ctx, -5, -30, pose.legB, 27, 11 * slim * wide, pantsB, stripe)
   ctx.beginPath()
   ctx.ellipse(lb[0] + 3, lb[1] + 1, 8, 5, 0, 0, Math.PI * 2)
   strokeFill(ctx, shade(look.shoes, -0.15), 2.5)
 
-  const lf = limb(ctx, 5, -30, pose.legF, pose.legFLen, 11 * slim, look.pants, stripe)
+  const lf = limb(ctx, 5, -30, pose.legF, pose.legFLen, 11 * slim * wide, look.pants, stripe)
   ctx.beginPath()
   ctx.ellipse(lf[0] + 3, lf[1] + 1, 8.5, 5.5, 0, 0, Math.PI * 2)
   strokeFill(ctx, look.shoes, 2.5)
 
   ctx.save()
-  ctx.scale(slim, 1)
+  ctx.scale(slim * wide, 1)
   drawTorso(ctx, look)
   ctx.restore()
   drawHead(ctx, look, pose)
 
-  const frontEnd = limb(ctx, 5, -54, pose.armF, pose.armFLen, 9 * slim, look.top, stripe)
+  const frontEnd = limb(ctx, 5, -54, pose.armF, pose.armFLen, 9 * slim * wide, look.top, stripe)
   if (d.goldFists) {
     ctx.save()
     ctx.shadowColor = GOLD
